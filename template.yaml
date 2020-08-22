@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Parameters:
+  Prefix:
+    Description: Each resource prefix setting.
+    Type: String
+    Default: test
+Resources:
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${Prefix}-xls-to-csv
+      Description: Convert Excel file to CSV file
+      CodeUri: functions/xlsx-to-csv/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Timeout: 300
+      Role: !GetAtt LambdaFunctionRole.Arn
+      Environment:
+        Variables:
+          DATA_TARGET_BUCKET : !Ref TargetBucket
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref SorceBucket
+            Events: s3:ObjectCreated:*
+      Layers:
+        - !Ref LambdaLayer
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+  SorceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${Prefix}-date-sorce-bucket-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  TargetBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${Prefix}-date-target-bucket-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+  LambdaLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub ${Prefix}-openpyxl-layer
+      ContentUri: './library/openpyxl.zip'
+      CompatibleRuntimes:
+        - python3.6
+        - python3.7
+        - python3.8
+
+
